@@ -1,0 +1,40 @@
+name: Import live official RS API
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/import_api.py
+      - .github/workflows/import-api.yml
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: api-import
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect official public sheets and verify inventories
+        run: python3 scripts/import_api.py
+      - name: Save source-backed API snapshots
+        run: |
+          git config user.name 'govbizlist-data-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/rs-api
+          if ! git diff --cached --quiet; then
+            git commit -m 'Import official RS API inventories and complete sheet payloads'
+            git pull --rebase origin main
+            git push
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - uses: actions/deploy-pages@v4
+        id: deployment
