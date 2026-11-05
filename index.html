@@ -57,3 +57,5 @@ $('citysearch').oninput=cityRender;$('citypref').onchange=cityRender;$('cityscop
 $('citycsv').onclick=()=>{const rows=[['計画ID（サイト内）','事業名','選定日','都道府県','自治体','自治体コード','役割','共同提案団体等','交付決定額','支出額','出典'],...municipalData.records.flatMap(r=>r.members.map(m=>[r.id,r.program,r.selected,r.pref,m.name,m.code||'',m.role,r.partners.join('／'),'未取得','未取得',r.source]))];const blob=new Blob(['\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download='public-trace-municipal-relations.csv';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
 const initialCity=new URLSearchParams(location.hash.slice(1)).get('municipality');if(municipalData.cities.some(c=>c.code===initialCity)){currentCity=initialCity;$('cityscope').value='all';requestAnimationFrame(()=>$('municipalities').scrollIntoView())}cityRender();
 </script><script src="trace-data.js"></script><script src="trace.js"></script></html>
+
+<script src="rs.js"></script>

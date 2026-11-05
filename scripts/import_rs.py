@@ -12,6 +12,7 @@ for year in (2024,2025):
     # Discover every ZIP advertised by the official download page and its JS bundles.
     try:
         page=get(f'https://rssystem.go.jp/download-csv/{year}').decode('utf-8')
+        print('OFFICIAL PAGE',year,page[:16000],flush=True)
         texts=[page]
         assets=re.findall(r'<script[^>]+src=["\']([^"\']+)',page)
         for asset in assets:
@@ -25,6 +26,7 @@ manifest={'generated':datetime.datetime.now(datetime.timezone.utc).isoformat(),'
 projects=[];payees=[];ministries=set()
 def task(url):
     raw=get(urllib.parse.quote(url,safe=':/%'))
+    if not raw.startswith(b'PK'):raise ValueError('Non-ZIP response: '+raw[:1800].decode('utf-8',errors='replace'))
     z=zipfile.ZipFile(io.BytesIO(raw));result=[]
     for entry in z.namelist():
         if not entry.lower().endswith('.csv'):continue
