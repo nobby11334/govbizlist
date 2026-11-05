@@ -1,0 +1,39 @@
+name: Import official RS data
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/import_rs.py
+      - .github/workflows/import-rs.yml
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+concurrency:
+  group: rs-import
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and validate official complete CSV files
+        run: python3 scripts/import_rs.py
+      - name: Save source-backed data
+        run: |
+          git config user.name 'govbizlist-data-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/rs
+          if ! git diff --cached --quiet; then
+            git commit -m 'Import complete official RS CSV rows and source manifests'
+            git push
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - uses: actions/deploy-pages@v4
+        id: deployment
