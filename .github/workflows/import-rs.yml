@@ -21,8 +21,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect current official data distribution
-        run: python3 scripts/discover_rs.py
       - name: Download and validate official complete CSV files
         run: python3 scripts/import_rs.py
       - name: Save source-backed data
@@ -32,6 +30,7 @@ jobs:
           git add data/rs
           if ! git diff --cached --quiet; then
             git commit -m 'Import complete official RS CSV rows and source manifests'
+            git pull --rebase origin main
             git push
           fi
       - uses: actions/upload-pages-artifact@v3

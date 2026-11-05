@@ -34,7 +34,7 @@ def names(value):
     found=[]
     if isinstance(value,dict):
         for k,v in value.items():
-            if isinstance(v,str) and any(w in k.lower() for w in ('name','agency','owner','corporate','ministry')):found.append(v)
+            if isinstance(v,str) and (k in ('n','cn') or any(w in k.lower() for w in ('name','agency','owner','corporate','ministry'))):found.append(v)
             elif isinstance(v,(dict,list)):found.extend(names(v))
     elif isinstance(value,list):
         for v in value:found.extend(names(v))
