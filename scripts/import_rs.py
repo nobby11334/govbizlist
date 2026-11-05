@@ -16,7 +16,9 @@ for year in (2024,2025):
         texts=[page]
         assets=re.findall(r'<script[^>]+src=["\']([^"\']+)',page)
         for asset in assets:
-            try:texts.append(get(urllib.parse.urljoin('https://rssystem.go.jp',asset)).decode('utf-8'))
+            try:
+                bundle=get(urllib.parse.urljoin('https://rssystem.go.jp',asset)).decode('utf-8');texts.append(bundle)
+                print('BUNDLE CONTEXT', '\n'.join(bundle[max(0,m.start()-250):m.end()+350] for m in list(re.finditer(r'download-csv|\.zip|ndjson|csvFiles|csv-files',bundle))[:60]),flush=True)
             except Exception:pass
         for text in texts:
             for link in re.findall(r'(?:https://rssystem.go.jp)?/files/[^\s"\'<>`]+?\.zip',text):
