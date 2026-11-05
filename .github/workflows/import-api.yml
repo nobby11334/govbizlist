@@ -1,4 +1,4 @@
-name: Import live official RS API
+name: Import extended RS snapshots
 on:
   workflow_dispatch:
   push:
@@ -21,15 +21,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Collect official public sheets and verify inventories
+      - name: Import pinned RS-derived snapshots and record provenance
         run: python3 scripts/import_api.py
       - name: Save source-backed API snapshots
         run: |
           git config user.name 'govbizlist-data-bot'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/rs-api
+          git add data/extended
           if ! git diff --cached --quiet; then
-            git commit -m 'Import official RS API inventories and complete sheet payloads'
+            git commit -m 'Import pinned 2025-2026 RS-derived snapshots with provenance'
             git pull --rebase origin main
             git push
           fi
