@@ -58,4 +58,4 @@ $('citycsv').onclick=()=>{const rows=[['計画ID（サイト内）','事業名',
 const initialCity=new URLSearchParams(location.hash.slice(1)).get('municipality');if(municipalData.cities.some(c=>c.code===initialCity)){currentCity=initialCity;$('cityscope').value='all';requestAnimationFrame(()=>$('municipalities').scrollIntoView())}cityRender();
 </script><script src="trace-data.js"></script><script src="trace.js"></script></html>
 
-<script src="rs.js"></script>
+<script src="rs.js?v=20261105-2"></script>
