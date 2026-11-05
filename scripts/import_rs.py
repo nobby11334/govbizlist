@@ -5,29 +5,21 @@ OUT=ROOT/'data'/'rs';OUT.mkdir(parents=True,exist_ok=True)
 def get(url):
     with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'govbizlist public-data-import/1.0'}),timeout=120) as r:return r.read()
 def dump(path,obj):path.write_text(json.dumps(obj,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-urls=set()
-for year in (2024,2025):
-    for stem in ('1-1_基本情報_組織情報','1-2_基本情報_事業概要等','5-1_支出先_支出情報'):
-        code,rest=stem.split('_',1);urls.add(f'https://rssystem.go.jp/files/{year}/rs/{code}_RS_{year}_{rest}.zip')
-    # Discover every ZIP advertised by the official download page and its JS bundles.
-    try:
-        page=get(f'https://rssystem.go.jp/download-csv/{year}').decode('utf-8')
-        print('OFFICIAL PAGE',year,page[:16000],flush=True)
-        texts=[page]
-        assets=re.findall(r'<script[^>]+src=["\']([^"\']+)',page)
-        for asset in assets:
-            try:
-                bundle=get(urllib.parse.urljoin('https://rssystem.go.jp',asset)).decode('utf-8');texts.append(bundle)
-                print('BUNDLE CONTEXT', '\n'.join(bundle[max(0,m.start()-250):m.end()+350] for m in list(re.finditer(r'download-csv|\.zip|ndjson|csvFiles|csv-files',bundle))[:60]),flush=True)
-            except Exception:pass
-        for text in texts:
-            for link in re.findall(r'(?:https://rssystem.go.jp)?/files/[^\s"\'<>`]+?\.zip',text):
-                if '/'+str(year)+'/' in link:urls.add(urllib.parse.urljoin('https://rssystem.go.jp',link))
-    except Exception as exc:print('Discovery:',year,str(exc),flush=True)
-manifest={'generated':datetime.datetime.now(datetime.timezone.utc).isoformat(),'source':'https://rssystem.go.jp/download-csv','years':[2024,2025],'files':[],'failures':[],'scope':'取得できた公式CSVは全行・全列を保持。全国の全支払・全再委託先の網羅ではありません。'}
+# Pinned redistribution of the original government ZIPs, used while direct URLs
+# return HTML. Preserve provenance and do not describe this as fresh official retrieval.
+MIRROR='5a7e4ab09149684caf7ab2f94fd977538edd4e04'
+tree=json.loads(get('https://api.github.com/repos/team-mirai-volunteer/gov-vis/git/trees/'+MIRROR+'?recursive=1'))
+source_map={}
+for item in tree['tree']:
+    if item['path'].startswith('downloads/') and item['path'].endswith('.zip'):
+        name=item['path'].split('/')[-1]
+        official='https://rssystem.go.jp/files/2024/rs/'+name
+        source_map[official]='https://raw.githubusercontent.com/team-mirai-volunteer/gov-vis/'+MIRROR+'/'+urllib.parse.quote(item['path'])
+urls=set(source_map)
+manifest={'generated':datetime.datetime.now(datetime.timezone.utc).isoformat(),'source':'https://rssystem.go.jp/download-csv','years':[2024],'files':[],'failures':[],'scope':'2024年公式CSVの公開保存版（gov-visから取得）を全行・全列収録。公式最新版との再照合は未了。2025年以降・基金シート・全国の全支払・全再委託先は未収録。'}
 projects=[];payees=[];ministries=set()
 def task(url):
-    raw=get(urllib.parse.quote(url,safe=':/%'))
+    raw=get(source_map[url])
     if not raw.startswith(b'PK'):raise ValueError('Non-ZIP response: '+raw[:1800].decode('utf-8',errors='replace'))
     z=zipfile.ZipFile(io.BytesIO(raw));result=[]
     for entry in z.namelist():
@@ -53,7 +45,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             base=f'{year}-{code}-{ti}';shards=[]
             for start in range(0,len(rows),1500):
                 filename=f'{base}-{start//1500}.json';dump(OUT/filename,{'headers':headers,'rows':rows[start:start+1500]});shards.append(filename)
-            record={'id':base,'year':year,'code':code,'url':url,'name':name,'encoding':enc,'sha256':hashlib.sha256(raw).hexdigest(),'rows':len(rows),'columns':len(headers),'headers':headers,'shards':shards};manifest['files'].append(record)
+            record={'id':base,'year':year,'code':code,'url':url,'downloadedFrom':source_map[url],'mirrorCommit':MIRROR,'name':name,'encoding':enc,'sha256':hashlib.sha256(raw).hexdigest(),'rows':len(rows),'columns':len(headers),'headers':headers,'shards':shards};manifest['files'].append(record)
             print(year,code,len(rows),headers,flush=True)
             def col(*names):
                 return next((i for n in names for i,h in enumerate(headers) if h==n),None)
@@ -72,7 +64,7 @@ manifest['files'].sort(key=lambda x:x['id']);manifest['ministries']=sorted(minis
 for year in (2024,2025):
     dump(OUT/f'projects-{year}.json',[r for r in projects if r[3]==year]);dump(OUT/f'payees-{year}.json',[r for r in payees if r[5]==year])
 dump(OUT/'manifest.json',manifest)
-required={(y,c) for y in (2024,2025) for c in ('1-1','1-2','5-1')}
+required={(y,c) for y in (2024,) for c in ('1-1','1-2','5-1')}
 actual={(f['year'],f['code']) for f in manifest['files']}
 if not required<=actual:raise SystemExit('Required datasets missing: '+str(required-actual))
 if not payees or not any(r[0] for r in payees):raise SystemExit('Payee name schema not recognized; inspect headers')
