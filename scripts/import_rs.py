@@ -17,7 +17,7 @@ for item in tree['tree']:
         source_map[official]='https://raw.githubusercontent.com/team-mirai-volunteer/gov-vis/'+MIRROR+'/'+urllib.parse.quote(item['path'])
 urls=set(source_map)
 manifest={'generated':datetime.datetime.now(datetime.timezone.utc).isoformat(),'source':'https://rssystem.go.jp/download-csv','years':[2024],'files':[],'failures':[],'scope':'2024年公式CSVの公開保存版（gov-visから取得）を全行・全列収録。公式最新版との再照合は未了。2025年以降・基金シート・全国の全支払・全再委託先は未収録。'}
-projects=[];payees=[];ministries=set()
+projects=[];payees=[];ministries=set();links={}
 def task(url):
     raw=get(source_map[url])
     if not raw.startswith(b'PK'):raise ValueError('Non-ZIP response: '+raw[:1800].decode('utf-8',errors='replace'))
@@ -53,6 +53,11 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             ministry=col('府省庁','府省庁名');title=col('事業名','事業名称');pid=col('予算事業ID','事業ID','事業番号');recipient=col('支出先名','支出先','支出先の名称');corp=col('法人番号')
             for ri,row in enumerate(rows):
                 m=val(row,ministry);ministries.add(m)
+                key=val(row,pid)
+                if key:
+                    ranges=links.setdefault(key,{}).setdefault(base,[])
+                    if ranges and sum(ranges[-1])==ri:ranges[-1][1]+=1
+                    else:ranges.append([ri,1])
                 item=[val(row,title),m,val(row,pid),year,base,ri//1500,ri%1500]
                 if code=='1-2':projects.append(item)
                 if code=='5-1':
@@ -63,6 +68,7 @@ manifest['files'].sort(key=lambda x:x['id']);manifest['ministries']=sorted(minis
 # One compact index per year; every raw row is lazy-loaded from its source shard.
 for year in (2024,2025):
     dump(OUT/f'projects-{year}.json',[r for r in projects if r[3]==year]);dump(OUT/f'payees-{year}.json',[r for r in payees if r[5]==year])
+dump(OUT/'links-2024.json',links)
 dump(OUT/'manifest.json',manifest)
 required={(y,c) for y in (2024,) for c in ('1-1','1-2','5-1')}
 actual={(f['year'],f['code']) for f in manifest['files']}
