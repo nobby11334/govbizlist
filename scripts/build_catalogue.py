@@ -131,6 +131,9 @@ for (year,pid),p in programs.items():
             for row in p['tables'].get(code,[]):
                 d=dict(zip(headers[code],row));add_org(d.get('支出先名') or d.get('契約先名（国庫債務負担行為等による契約）'),d.get('法人番号') or d.get('契約先の法人番号（国庫債務負担行為等による契約）'),ref,other=d.get('その他支出先')=='TRUE')
     if year==2025:
+        for code in ('5-1','5-3','5-4'):
+            for row in p.get('officialTables',{}).get(code,[]):
+                d=dict(zip(official_headers[code],row));add_org(d.get('支出先名') or d.get('契約先名（国庫債務負担行為等による契約）'),d.get('法人番号') or d.get('契約先の法人番号（国庫債務負担行為等による契約）'),ref,other=d.get('その他支出先')=='TRUE')
         for b in p['flows'].get('blocks',[]):
             for o in b.get('recipients',[]):add_org(o.get('name'),o.get('corporateNumber'),ref)
     if year==2026:
@@ -150,7 +153,7 @@ for o in orgs.values():
     for field in ('aliases','refs','funds','segments'):o[field]=sorted(o[field])
     org_index.append(o)
 org_index.sort(key=lambda o:o['name']);put('organizations.json.gz',org_index)
-meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'organizationCount':len(org_index),'officialHeaders':official_headers,'officialRows':official_rows,'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:(root_order.get(r['name'],999),r['name'])),'headers':headers,'sources':{'csv':rs,'extended':ex,'evidence':evidence,'official':official},'notes':['2024年版は公開保存された原CSVの全行を事業単位で接続。','2025・2026年版は加工済みの公開保存版。2026年版の成果・評価は未収録。予算科目は別資料の対応・要求額を区別して接続。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
+meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'organizationCount':len(org_index),'officialHeaders':official_headers,'officialRows':official_rows,'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:(root_order.get(r['name'],999),r['name'])),'headers':headers,'sources':{'csv':rs,'extended':ex,'evidence':evidence,'official':official},'notes':['2024年版は公開保存された原CSVの全行を事業単位で接続。','2025年版は直接取得した公式原CSVの全行・全列と加工済み表示を接続。2026年版は加工済み暫定保存版で、成果・評価は未収録。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
 put('meta.json',meta);put('funds.json.gz',funds);put('fund-payments.json.gz',fund_payments);put('segments.json.gz',segments)
 # Compact representative schemas for verifying complete rendering, never a data cap.
 put('schema-samples.json',{n:{'keys':list(d.keys()),'sample':d} for n,d in [('overview',next(iter(base.values()))),('budget',next(iter(budget['projects'].values()))[0]),('outcomes',next(iter(outcomes.values()))),('flow',next(iter(flows.values())))]})
