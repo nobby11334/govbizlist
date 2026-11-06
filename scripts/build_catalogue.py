@@ -1,5 +1,5 @@
 """Build institution-first catalogue, filling fields only from same-year source records."""
-import json,gzip,pathlib,hashlib,datetime,collections,re
+import json,gzip,pathlib,hashlib,datetime,collections,re,zipfile,csv,io
 ROOT=pathlib.Path(__file__).resolve().parents[1];OUT=ROOT/'data'/'catalogue';OUT.mkdir(parents=True,exist_ok=True)
 def load(p):
     b=p.read_bytes();return json.loads(gzip.decompress(b) if p.suffix=='.gz' else b)
@@ -34,6 +34,30 @@ for pid,d in base.items():
     bureau=graph.get('bureau') or d.get('bureau') or ''
     path=[d.get('ministry') or graph.get('ministry') or '']+[s.strip() for s in bureau.split('/') if s.strip()]
     programs[(2025,str(pid))]={'id':str(pid),'year':2025,'name':d.get('projectName') or graph.get('projectName') or '', 'ministry':d.get('ministry') or graph.get('ministry') or '', 'departments':[path] if any(path) else [],'overview':d,'budget':budget.get('projects',{}).get(pid,[]),'outcomes':outcomes.get(pid),'indicators':indicators.get(pid),'contracts':contracts.get(pid,[]),'flows':graph}
+official_file=ROOT/'data'/'official'/'manifest.json'
+official=load(official_file) if official_file.exists() else None
+official_headers={};official_rows=0;official_started=set()
+if official:
+    assert len(official['files'])==15
+    for file in sorted(official['files'],key=lambda f:f['code']):
+        zip_path=ROOT/'data'/'official'/file['file'];raw=zip_path.read_bytes()
+        assert hashlib.sha256(raw).hexdigest()==file['sha256']
+        z=zipfile.ZipFile(io.BytesIO(raw));reader=csv.reader(io.StringIO(z.read(file['csv']).decode(file['encoding'])));h=next(reader);code=file['code'];official_headers[code]=h
+        count=0
+        for row in reader:
+            if not any(row):continue
+            count+=1;d=dict(zip(h,row));pid=str(d.get('予算事業ID',''))
+            if not pid:raise ValueError('Official CSV row has no project ID')
+            p=programs.setdefault((2025,pid),{'id':pid,'year':2025,'name':d.get('事業名',''),'ministry':d.get('府省庁',''),'departments':[],'overview':{},'budget':[],'outcomes':None,'indicators':None,'contracts':[],'flows':{}})
+            p.setdefault('officialTables',{}).setdefault(code,[]).append(row)
+            if code=='1-1':
+                if pid not in official_started:p['departments']=[];official_started.add(pid)
+                path=[d.get(k,'') for k in ['府省庁','局・庁','部','課','室','班','係']];path=[v for v in path if v]
+                if path and path not in p['departments']:p['departments'].append(path)
+                if d.get('府省庁') and d.get('所管府省庁'):parent[clean(d['府省庁'])]=d['所管府省庁']
+            if code=='1-2':
+                p.setdefault('officialOverview',d);p['name']=d.get('事業名') or p['name'];p['ministry']=d.get('府省庁') or p['ministry']
+        assert count==file['rows'],(code,count,file['rows']);official_rows+=count
 for pid,d in ext('rs-api-2026-details').items():
     programs[(2026,str(pid))]={'id':str(pid),'year':2026,'name':d.get('name',''),'ministry':d.get('ministry',''),'departments':[[d['ministry']]] if d.get('ministry') else [],'api':d}
 evidence=load(ROOT/'data'/'evidence'/'manifest.json') if (ROOT/'data'/'evidence'/'manifest.json').exists() else None
@@ -126,9 +150,9 @@ for o in orgs.values():
     for field in ('aliases','refs','funds','segments'):o[field]=sorted(o[field])
     org_index.append(o)
 org_index.sort(key=lambda o:o['name']);put('organizations.json.gz',org_index)
-meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'organizationCount':len(org_index),'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:(root_order.get(r['name'],999),r['name'])),'headers':headers,'sources':{'csv':rs,'extended':ex,'evidence':evidence},'notes':['2024年版は公開保存された原CSVの全行を事業単位で接続。','2025・2026年版は加工済みの公開保存版。2026年版の成果・評価は未収録。予算科目は別資料の対応・要求額を区別して接続。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
+meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'organizationCount':len(org_index),'officialHeaders':official_headers,'officialRows':official_rows,'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:(root_order.get(r['name'],999),r['name'])),'headers':headers,'sources':{'csv':rs,'extended':ex,'evidence':evidence,'official':official},'notes':['2024年版は公開保存された原CSVの全行を事業単位で接続。','2025・2026年版は加工済みの公開保存版。2026年版の成果・評価は未収録。予算科目は別資料の対応・要求額を区別して接続。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
 put('meta.json',meta);put('funds.json.gz',funds);put('fund-payments.json.gz',fund_payments);put('segments.json.gz',segments)
 # Compact representative schemas for verifying complete rendering, never a data cap.
 put('schema-samples.json',{n:{'keys':list(d.keys()),'sample':d} for n,d in [('overview',next(iter(base.values()))),('budget',next(iter(budget['projects'].values()))[0]),('outcomes',next(iter(outcomes.values()))),('flow',next(iter(flows.values())))]})
 assert len(indexes[2025])==len(base) and len(indexes[2026])==len(ext('rs-api-2026-details'))
-print(json.dumps({'counts':counts,'organizationCount':len(org_index),'coverage':coverage,'roots':len(roots),'csvRows':sum(raw_counts.values())},ensure_ascii=False),flush=True)
+print(json.dumps({'counts':counts,'organizationCount':len(org_index),'officialHeaders':official_headers,'officialRows':official_rows,'coverage':coverage,'roots':len(roots),'csvRows':sum(raw_counts.values())},ensure_ascii=False),flush=True)

@@ -1,0 +1,174 @@
+{
+  "downloadedAt": "2026-11-06T00:34:08.428746+00:00",
+  "asOf": "2026-01-19",
+  "method": "公式ダウンロード画面のZIPボタンから直接取得",
+  "sourcePage": "https://rssystem.go.jp/download-csv/2025",
+  "year": 2025,
+  "files": [
+    {
+      "file": "2025/1-1_RS_2025_基本情報_組織情報.zip",
+      "csv": "1-1_RS_2025_基本情報_組織情報.csv",
+      "code": "1-1",
+      "bytes": 258071,
+      "sha256": "a9d353df76661fd140ca9fa38db9ab6059441bc7c657dd36fdf60ddb6fb1736b",
+      "rows": 8540,
+      "columns": 22,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/1-2_RS_2025_基本情報_事業概要等.zip",
+      "csv": "1-2_RS_2025_基本情報_事業概要等.csv",
+      "code": "1-2",
+      "bytes": 3261688,
+      "sha256": "4030473de09a9e622d9d6ab049c3e3dc4cda9cfacafb2f962bd62da08e9b98c2",
+      "rows": 6061,
+      "columns": 32,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/1-3_RS_2025_基本情報_政策・施策、法令等.zip",
+      "csv": "1-3_RS_2025_基本情報_政策・施策、法令等.csv",
+      "code": "1-3",
+      "bytes": 836837,
+      "sha256": "a1cb674ebea3ef7808fea9384110785fc9f71b3dd39ee098b618bf05f05603a6",
+      "rows": 15821,
+      "columns": 28,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/1-4_RS_2025_基本情報_補助率等.zip",
+      "csv": "1-4_RS_2025_基本情報_補助率等.csv",
+      "code": "1-4",
+      "bytes": 316778,
+      "sha256": "c3f9ae7f7b85e8423446986a5921af9fad645ddd862f1f67ca3355653ac6c346",
+      "rows": 6080,
+      "columns": 18,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/1-5_RS_2025_基本情報_関連事業.zip",
+      "csv": "1-5_RS_2025_基本情報_関連事業.csv",
+      "code": "1-5",
+      "bytes": 200353,
+      "sha256": "a2984b0ada0cf723281f44208b83f848b48e03de83c462ce1e36dbfd1556a143",
+      "rows": 6302,
+      "columns": 17,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/2-1_RS_2025_予算・執行_サマリ.zip",
+      "csv": "2-1_RS_2025_予算・執行_サマリ.csv",
+      "code": "2-1",
+      "bytes": 1757530,
+      "sha256": "6540aa6a8902a061656233c4888e164b3596e9592a86cde4df9d1afe6064d1b6",
+      "rows": 47100,
+      "columns": 44,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/2-2_RS_2025_予算・執行_予算種別・歳出予算項目.zip",
+      "csv": "2-2_RS_2025_予算・執行_予算種別・歳出予算項目.csv",
+      "code": "2-2",
+      "bytes": 1231793,
+      "sha256": "2419675cd011192e35eed1bf332c6028366d3cbc07272630d99378e41b90b7c6",
+      "rows": 70915,
+      "columns": 26,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/3-1_RS_2025_効果発現経路_目標・実績.zip",
+      "csv": "3-1_RS_2025_効果発現経路_目標・実績.csv",
+      "code": "3-1",
+      "bytes": 5309287,
+      "sha256": "bd94115f5fa638fd44dc7b1bd324c6ebe8d35c7f21108b14b861c4cc0635fda6",
+      "rows": 128516,
+      "columns": 82,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/3-2_RS_2025_効果発現経路_目標のつながり.zip",
+      "csv": "3-2_RS_2025_効果発現経路_目標のつながり.csv",
+      "code": "3-2",
+      "bytes": 3698528,
+      "sha256": "ddb3ad38e460243f08e6d8cdf3d240fcd4b26b78ce9d3b14302e68d615ffd3f4",
+      "rows": 31726,
+      "columns": 25,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/4-1_RS_2025_点検・評価.zip",
+      "csv": "4-1_RS_2025_点検・評価.csv",
+      "code": "4-1",
+      "bytes": 2451332,
+      "sha256": "93248128997ba9cef4ada8f49c4d012dcb5f6fbb72a9a3148e9c07d1ae98184d",
+      "rows": 5831,
+      "columns": 37,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/5-1_RS_2025_支出先_支出情報.zip",
+      "csv": "5-1_RS_2025_支出先_支出情報.csv",
+      "code": "5-1",
+      "bytes": 6078771,
+      "sha256": "e379dbc4aa4653b06f9a310cdb84fc795c880799cc68c5c5c7f8de194be2634c",
+      "rows": 193912,
+      "columns": 32,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/5-2_RS_2025_支出先_支出ブロックのつながり.zip",
+      "csv": "5-2_RS_2025_支出先_支出ブロックのつながり.csv",
+      "code": "5-2",
+      "bytes": 566177,
+      "sha256": "0a2636df78c68fcd94b1296ff1aa9580d936658121039e3a204025c99bed3a68",
+      "rows": 23381,
+      "columns": 22,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/5-3_RS_2025_支出先_費目・使途.zip",
+      "csv": "5-3_RS_2025_支出先_費目・使途.csv",
+      "code": "5-3",
+      "bytes": 1477461,
+      "sha256": "addd97465e8916b05b27a908447e2f8bc44ec7d78456825ab45895d283490965",
+      "rows": 34307,
+      "columns": 20,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/5-4_RS_2025_支出先_国庫債務負担行為等による契約.zip",
+      "csv": "5-4_RS_2025_支出先_国庫債務負担行為等による契約.csv",
+      "code": "5-4",
+      "bytes": 408787,
+      "sha256": "7dcc56293b9bc7d8a04e6ce4064a717f7e94618e07299812a145ad92e6a34e56",
+      "rows": 9716,
+      "columns": 27,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    },
+    {
+      "file": "2025/6-1_RS_2025_その他備考.zip",
+      "csv": "6-1_RS_2025_その他備考.csv",
+      "code": "6-1",
+      "bytes": 201951,
+      "sha256": "ad748fa644e14a691470d5a9f41c653f23a4b69353f037afc0ba53cd0b5d8ba3",
+      "rows": 5794,
+      "columns": 14,
+      "encoding": "utf-8-sig",
+      "sourcePage": "https://rssystem.go.jp/download-csv/2025"
+    }
+  ]
+}
