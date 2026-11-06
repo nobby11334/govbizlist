@@ -24,12 +24,14 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - run: python3 scripts/hydrate_evidence.py
       - run: python3 scripts/build_catalogue.py
+      - run: python3 scripts/check_catalogue.py
       - name: Save assembled catalogue
         run: |
           git config user.name 'govbizlist-data-bot'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/catalogue
+          git add data/catalogue data/evidence
           if ! git diff --cached --quiet; then
             git commit -m 'Assemble complete same-year records into institution-first catalogue'
             git pull --rebase origin main

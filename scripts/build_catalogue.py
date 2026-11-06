@@ -9,7 +9,7 @@ def ext(name):return load(ROOT/'data'/'extended'/(name+'.json.gz'))
 def clean(v):return re.sub(r'\s+','',str(v or ''))
 def key(s):return hashlib.sha256(s.encode()).hexdigest()[:14]
 rs=load(ROOT/'data'/'rs'/'manifest.json');ex=load(ROOT/'data'/'extended'/'manifest.json')
-programs={};parent={};root_labels={};roots={};headers={};raw_counts=collections.Counter()
+programs={};parent={};root_labels={};root_order={};roots={};headers={};raw_counts=collections.Counter()
 # Read every original CSV row. Same-year facts are never patched with later/earlier amounts.
 for f in sorted(rs['files'],key=lambda x:x['code']):
     headers[f['code']]=f['headers']
@@ -22,7 +22,10 @@ for f in sorted(rs['files'],key=lambda x:x['code']):
             p['tables'].setdefault(f['code'],[]).append(row);raw_counts[f['code']]+=1
             if f['code']=='1-1':
                 m=d.get('府省庁','');r=d.get('所管府省庁') or m
-                if m and r:parent[clean(m)]=r;root_labels[clean(r)]=r
+                if m and r:
+                    parent[clean(m)]=r;root_labels[clean(r)]=r
+                    try:root_order[r]=min(root_order.get(r,999),int(d.get('建制順','999')))
+                    except ValueError:pass
                 path=[d.get(x,'') for x in ['府省庁','局・庁','部','課','室','班','係']];path=[v for v in path if v]
                 if path and path not in p['departments']:p['departments'].append(path)
 base=ext('rs2025-project-details');budget=ext('rs2025-project-budget-history');outcomes=ext('rs2025-project-outcomes');indicators=ext('rs2025-project-indicators');contracts=ext('contract-methods-2025');flows=ext('subcontracts-2025')
@@ -33,6 +36,19 @@ for pid,d in base.items():
     programs[(2025,str(pid))]={'id':str(pid),'year':2025,'name':d.get('projectName') or graph.get('projectName') or '', 'ministry':d.get('ministry') or graph.get('ministry') or '', 'departments':[path] if any(path) else [],'overview':d,'budget':budget.get('projects',{}).get(pid,[]),'outcomes':outcomes.get(pid),'indicators':indicators.get(pid),'contracts':contracts.get(pid,[]),'flows':graph}
 for pid,d in ext('rs-api-2026-details').items():
     programs[(2026,str(pid))]={'id':str(pid),'year':2026,'name':d.get('name',''),'ministry':d.get('ministry',''),'departments':[[d['ministry']]] if d.get('ministry') else [],'api':d}
+evidence=load(ROOT/'data'/'evidence'/'manifest.json') if (ROOT/'data'/'evidence'/'manifest.json').exists() else None
+for y in (2025,2026):
+    file=ROOT/'data'/'evidence'/f'mof-rs-kou-moku-linkage-{y}.json.gz'
+    if file.exists():
+        data=load(file);linked=collections.defaultdict(list)
+        for row in data.get('links',[]):linked[str(row['projectId'])].append(row)
+        for (py,pid),p in programs.items():
+            if py==y and pid in linked:p['budgetEvidence']={'metadata':{k:data['metadata'].get(k) for k in ('budgetYear','rsSheetYear','rsAmountKind','unit','generatedAt','notes')},'links':linked[pid]}
+file=ROOT/'data'/'evidence'/'contract-methods-2026.json.gz'
+if file.exists():
+    data=load(file)
+    for (y,pid),p in programs.items():
+        if y==2026:p['contracts']=data.get(pid,[])
 funds=ext('funds');fund_payments=ext('fund-payments');segments=ext('agency-segments');fund_by_pid=collections.defaultdict(list);segment_by_pid=collections.defaultdict(list)
 for f in funds['funds']:
     for y in f['years']:
@@ -57,9 +73,9 @@ for year in indexes:
                 overview=rowdict('1-2');overview=overview[0] if overview else {}
                 flags={'overview':bool(overview.get('事業の概要') or overview.get('事業の目的')),'budget':any(any(r.get(k) not in ('',None) for k in ['当初予算（合計）','執行額（合計）']) for r in rowdict('2-1')),'outcomes':any(r.get('アクティビティ／活動目標／成果目標') or r.get('活動指標／成果指標') for r in rowdict('3-1')),'payments':any(r.get('支出先名') for r in rowdict('5-1')),'evaluation':any(any(v for k,v in r.items() if k not in ('シート種別','事業年度','予算事業ID','事業名','府省庁の建制順','政策所管府省庁','府省庁','局・庁','部','課','室','班','係')) for r in rowdict('4-1')),'funding':bool(p['tables'].get('2-2'))}
             elif year==2025:
-                flags={'overview':bool(p['overview'].get('overview') or p['overview'].get('purpose')),'budget':any(any(v is not None for k,v in r.items() if k in ('initialBudget','totalBudget','executedAmount')) for r in p['budget']),'outcomes':any(i.get('goal') or i.get('indicator') for i in (p.get('outcomes') or p.get('indicators') or {}).get('indicators',[])),'payments':bool(p['flows'].get('blocks')),'evaluation':any(v for v in (p.get('outcomes') or {}).get('review',{}).values()),'funding':bool(p['flows'].get('accountCategory'))}
+                flags={'overview':bool(p['overview'].get('overview') or p['overview'].get('purpose')),'budget':any(any(v is not None for k,v in r.items() if k in ('initialBudget','totalBudget','executedAmount')) for r in p['budget']),'outcomes':any(i.get('goal') or i.get('indicator') for i in (p.get('outcomes') or p.get('indicators') or {}).get('indicators',[])),'payments':bool(p['flows'].get('blocks')),'evaluation':any(v for v in (p.get('outcomes') or {}).get('review',{}).values()),'funding':bool(p['flows'].get('accountCategory') or p.get('budgetEvidence',{}).get('links'))}
             else:
-                a=p['api'];flags={'overview':bool(a.get('overview') or a.get('purpose')),'budget':a.get('execution') is not None,'outcomes':False,'payments':bool(a.get('groups')),'evaluation':False,'funding':False}
+                a=p['api'];flags={'overview':bool(a.get('overview') or a.get('purpose')),'budget':a.get('execution') is not None,'outcomes':False,'payments':bool(a.get('groups')),'evaluation':False,'funding':bool(p.get('budgetEvidence',{}).get('links'))}
             p['coverage']=flags
             for k,v in flags.items():counters[k]+=int(v)
             p['gaps']=[k for k,v in flags.items() if not v]
@@ -110,7 +126,7 @@ for o in orgs.values():
     for field in ('aliases','refs','funds','segments'):o[field]=sorted(o[field])
     org_index.append(o)
 org_index.sort(key=lambda o:o['name']);put('organizations.json.gz',org_index)
-meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'organizationCount':len(org_index),'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:r['name']),'headers':headers,'sources':{'csv':rs,'extended':ex},'notes':['2024年版は公開保存された原CSVの全行を事業単位で接続。','2025・2026年版は加工済みの公開保存版。2026年版の成果・評価・財源はこの保存版に未収録。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
+meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'organizationCount':len(org_index),'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:(root_order.get(r['name'],999),r['name'])),'headers':headers,'sources':{'csv':rs,'extended':ex,'evidence':evidence},'notes':['2024年版は公開保存された原CSVの全行を事業単位で接続。','2025・2026年版は加工済みの公開保存版。2026年版の成果・評価は未収録。予算科目は別資料の対応・要求額を区別して接続。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
 put('meta.json',meta);put('funds.json.gz',funds);put('fund-payments.json.gz',fund_payments);put('segments.json.gz',segments)
 # Compact representative schemas for verifying complete rendering, never a data cap.
 put('schema-samples.json',{n:{'keys':list(d.keys()),'sample':d} for n,d in [('overview',next(iter(base.values()))),('budget',next(iter(budget['projects'].values()))[0]),('outcomes',next(iter(outcomes.values()))),('flow',next(iter(flows.values())))]})
