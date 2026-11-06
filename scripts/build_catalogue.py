@@ -55,9 +55,9 @@ for year in indexes:
             if year==2024:
                 def rowdict(code):return [dict(zip(headers[code],r)) for r in p['tables'].get(code,[])]
                 overview=rowdict('1-2');overview=overview[0] if overview else {}
-                flags={'overview':bool(overview.get('事業の概要') or overview.get('事業の目的')),'budget':any(any(r.get(k) not in ('',None) for k in ['当初予算（合計）','執行額（合計）']) for r in rowdict('2-1')),'outcomes':bool(p['tables'].get('3-1')),'payments':any(r.get('支出先名') for r in rowdict('5-1')),'evaluation':bool(p['tables'].get('4-1')),'funding':bool(p['tables'].get('2-2'))}
+                flags={'overview':bool(overview.get('事業の概要') or overview.get('事業の目的')),'budget':any(any(r.get(k) not in ('',None) for k in ['当初予算（合計）','執行額（合計）']) for r in rowdict('2-1')),'outcomes':any(r.get('アクティビティ／活動目標／成果目標') or r.get('活動指標／成果指標') for r in rowdict('3-1')),'payments':any(r.get('支出先名') for r in rowdict('5-1')),'evaluation':any(any(v for k,v in r.items() if k not in ('シート種別','事業年度','予算事業ID','事業名','府省庁の建制順','政策所管府省庁','府省庁','局・庁','部','課','室','班','係')) for r in rowdict('4-1')),'funding':bool(p['tables'].get('2-2'))}
             elif year==2025:
-                flags={'overview':bool(p['overview'].get('overview') or p['overview'].get('purpose')),'budget':any(any(v is not None for k,v in r.items() if k in ('initialBudget','totalBudget','executedAmount')) for r in p['budget']),'outcomes':bool(p.get('outcomes') or p.get('indicators')),'payments':bool(p['flows'].get('blocks')),'evaluation':bool((p.get('outcomes') or {}).get('review')),'funding':bool(p['flows'].get('accountCategory'))}
+                flags={'overview':bool(p['overview'].get('overview') or p['overview'].get('purpose')),'budget':any(any(v is not None for k,v in r.items() if k in ('initialBudget','totalBudget','executedAmount')) for r in p['budget']),'outcomes':any(i.get('goal') or i.get('indicator') for i in (p.get('outcomes') or p.get('indicators') or {}).get('indicators',[])),'payments':bool(p['flows'].get('blocks')),'evaluation':any(v for v in (p.get('outcomes') or {}).get('review',{}).values()),'funding':bool(p['flows'].get('accountCategory'))}
             else:
                 a=p['api'];flags={'overview':bool(a.get('overview') or a.get('purpose')),'budget':a.get('execution') is not None,'outcomes':False,'payments':bool(a.get('groups')),'evaluation':False,'funding':False}
             p['coverage']=flags
@@ -70,9 +70,49 @@ for year in indexes:
 for f in funds['funds']:f['root']=root_for(f['ministry'])
 for s in segments['segments']:s['root']=root_for(s['ministry'])
 for r in roots.values():r['members']=sorted(r['members'])
-meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:r['name']),'headers':headers,'sources':{'csv':rs,'extended':ex},'notes':['2024年版は公開保存された原CSVの全行を事業単位で接続。','2025・2026年版は加工済みの公開保存版。2026年版の成果・評価・財源はこの保存版に未収録。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
+orgs={}
+def add_org(name,corp='',ref=None,fund=None,segment=None,other=False):
+    name=str(name or '').strip();corp=str(corp or '').strip()
+    if not name or other or re.match(r'^(その他|其他|不明|非公表|複数の|個人等)$',name):return
+    valid=bool(re.fullmatch(r'\d{13}',corp)) and len(set(corp))>1
+    if valid:
+        total=sum(int(n)*(1 if i%2==0 else 2) for i,n in enumerate(reversed(corp[1:])))
+        valid=int(corp[0])==9-total%9
+    ident='cn:'+corp if valid else 'name:'+clean(name)
+    o=orgs.setdefault(ident,{'id':key(ident),'name':name,'corporateNumber':corp if valid else None,'aliases':set(),'refs':set(),'funds':set(),'segments':set()})
+    o['aliases'].add(name)
+    if ref:o['refs'].add(ref)
+    if fund:o['funds'].add(fund)
+    if segment:o['segments'].add(segment)
+for (year,pid),p in programs.items():
+    ref=(year,pid,p['root'])
+    if year==2024:
+        for code in ('5-1','5-3','5-4'):
+            for row in p['tables'].get(code,[]):
+                d=dict(zip(headers[code],row));add_org(d.get('支出先名') or d.get('契約先名（国庫債務負担行為等による契約）'),d.get('法人番号') or d.get('契約先の法人番号（国庫債務負担行為等による契約）'),ref,other=d.get('その他支出先')=='TRUE')
+    if year==2025:
+        for b in p['flows'].get('blocks',[]):
+            for o in b.get('recipients',[]):add_org(o.get('name'),o.get('corporateNumber'),ref)
+    if year==2026:
+        for g in p['api'].get('groups',[]):
+            for o in g.get('payments',[]):add_org(o.get('name'),o.get('corporate_number'),ref,other=o.get('is_others',False))
+for f in funds['funds']:
+    add_org(f.get('owner'),fund=f['key'])
+    for y,groups in fund_payments.get('funds',{}).get(f['key'],{}).items():
+        for g in groups:
+            for o in g.get('payees',[]):add_org(o.get('name'),o.get('corporateNumber'),fund=f['key'],other=o.get('others',False))
+for s in segments['segments']:
+    add_org(s['agency'],segment=s['id'])
+    for g in s.get('groups',[]):
+        for o in g.get('payees',[]):add_org(o.get('name'),o.get('corporateNumber'),segment=s['id'],other=o.get('others',False))
+org_index=[]
+for o in orgs.values():
+    for field in ('aliases','refs','funds','segments'):o[field]=sorted(o[field])
+    org_index.append(o)
+org_index.sort(key=lambda o:o['name']);put('organizations.json.gz',org_index)
+meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'organizationCount':len(org_index),'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:r['name']),'headers':headers,'sources':{'csv':rs,'extended':ex},'notes':['2024年版は公開保存された原CSVの全行を事業単位で接続。','2025・2026年版は加工済みの公開保存版。2026年版の成果・評価・財源はこの保存版に未収録。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
 put('meta.json',meta);put('funds.json.gz',funds);put('fund-payments.json.gz',fund_payments);put('segments.json.gz',segments)
 # Compact representative schemas for verifying complete rendering, never a data cap.
 put('schema-samples.json',{n:{'keys':list(d.keys()),'sample':d} for n,d in [('overview',next(iter(base.values()))),('budget',next(iter(budget['projects'].values()))[0]),('outcomes',next(iter(outcomes.values()))),('flow',next(iter(flows.values())))]})
 assert len(indexes[2025])==len(base) and len(indexes[2026])==len(ext('rs-api-2026-details'))
-print(json.dumps({'counts':counts,'coverage':coverage,'roots':len(roots),'csvRows':sum(raw_counts.values())},ensure_ascii=False),flush=True)
+print(json.dumps({'counts':counts,'organizationCount':len(org_index),'coverage':coverage,'roots':len(roots),'csvRows':sum(raw_counts.values())},ensure_ascii=False),flush=True)

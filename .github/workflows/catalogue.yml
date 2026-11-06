@@ -1,6 +1,9 @@
 name: Build institution catalogue
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: [Import official RS data, Import extended RS snapshots]
+    types: [completed]
   push:
     paths:
       - scripts/build_catalogue.py
@@ -14,6 +17,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
