@@ -29,3 +29,18 @@ for o in orgs:
 for f in read('funds.json.gz')['funds']:assert f['root'] in roots
 for s in read('segments.json.gz')['segments']:assert s['root'] in roots
 print(json.dumps({'programs':sum(m['counts'].values()),'originalCsvRows':source_rows,'directOfficialRows2025':official_rows,'organizations':len(orgs),'roots':len(roots),'allReferencesValid':True}),flush=True)
+
+if m['sources'].get('live'):
+    import hashlib
+    live=m['sources']['live']; live_root=root.parent/'live'
+    for f in live['files']:
+        raw=(live_root/f['file']).read_bytes();assert hashlib.sha256(raw).hexdigest()==f['sha256']
+        d=json.loads(gzip.decompress(raw));rows=d['records']
+        assert len(rows)==f['count']==len({v['id'] for v in rows})
+        assert all(v['fiscal_year']==f['year'] and v['sheet_type']==f['type'] and v['name'] for v in rows)
+        for page in d['pages']:
+            if 'rawResponse' in page:assert hashlib.sha256(page['rawResponse'].encode()).hexdigest()==page['sha256']
+        if f['type']=='RS':
+            for v in rows:assert (f['year'],str(int(v['project_number']))) in known
+    assert all((2026,str(int(v['projectNumber']))) in known for v in live['new2026'])
+    print('Official inventories: all hashes, counts, years, uniqueness and search references valid')

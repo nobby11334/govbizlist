@@ -9,12 +9,27 @@ def ext(name):return load(ROOT/'data'/'extended'/(name+'.json.gz'))
 def clean(v):return re.sub(r'\s+','',str(v or ''))
 def key(s):return hashlib.sha256(s.encode()).hexdigest()[:14]
 rs=load(ROOT/'data'/'rs'/'manifest.json');ex=load(ROOT/'data'/'extended'/'manifest.json')
+correction_file=ROOT/'data/official-checks/manifest.json'
+corrections=load(correction_file) if correction_file.exists() else None
+if corrections:
+    rs=json.loads(json.dumps(rs))
+    for f in corrections['files']:
+        if f['year']!=2024 or not f['changed']:continue
+        original=next(o for o in rs['files'] if o['code']==f['code'])
+        original.update({'headers':f['headers'],'rows':f['rows'],'columns':f['columns'],'sha256':f['sha256'],'downloadedFrom':f['url'],'directCSV':f['file'],'checkedAt':corrections['checkedAt']})
+def source_tables(f):
+    if not f.get('directCSV'):
+        for shard in f['shards']:yield load(ROOT/'data/rs'/shard)
+    else:
+        raw=(ROOT/'data/official-checks'/f['directCSV']).read_bytes();assert hashlib.sha256(raw).hexdigest()==f['sha256']
+        z=zipfile.ZipFile(io.BytesIO(raw));name=next(n for n in z.namelist() if n.endswith('.csv'))
+        rows=list(csv.reader(io.StringIO(z.read(name).decode('utf-8-sig'))));h=rows.pop(0)
+        yield {'headers':h,'rows':[r for r in rows if any(r)]}
 programs={};parent={};root_labels={};root_order={};roots={};headers={};raw_counts=collections.Counter()
 # Read every original CSV row. Same-year facts are never patched with later/earlier amounts.
 for f in sorted(rs['files'],key=lambda x:x['code']):
     headers[f['code']]=f['headers']
-    for shard in f['shards']:
-        table=load(ROOT/'data'/'rs'/shard)
+    for table in source_tables(f):
         for row in table['rows']:
             d=dict(zip(table['headers'],row));pid=d.get('予算事業ID')
             if not pid:continue
@@ -60,6 +75,30 @@ if official:
         assert count==file['rows'],(code,count,file['rows']);official_rows+=count
 for pid,d in ext('rs-api-2026-details').items():
     programs[(2026,str(pid))]={'id':str(pid),'year':2026,'name':d.get('name',''),'ministry':d.get('ministry',''),'departments':[[d['ministry']]] if d.get('ministry') else [],'api':d}
+# Official inventory is a separately dated source; never overwrite saved payment graphs.
+live_file=ROOT/'data/live/manifest.json';live=load(live_file) if live_file.exists() else None
+live_count=None
+if live:
+    f=next(f for f in live['files'] if f['year']==2026 and f['type']=='RS')
+    raw=(ROOT/'data/live'/f['file']).read_bytes();assert hashlib.sha256(raw).hexdigest()==f['sha256']
+    records=json.loads(gzip.decompress(raw))['records'];live_count=len(records)
+    for d in records:
+        pid=str(int(d['project_number']));k=(2026,pid)
+        p=programs.setdefault(k,{'id':pid,'year':2026,'name':d['name'],'ministry':d['ministry_name'],'departments':[],'api':{}})
+        if p['api'].get('id'):assert p['api']['id']==d['id'],'Numeric project ID collision'
+        p['liveOverview']={'purpose':d.get('purpose'),'overview':d.get('overview'),'currentIssues':d.get('task'),'startYear':d.get('start_year'),'endYear':d.get('end_year')}
+        p['liveRecord']={'id':d['id'],'checkedAt':live['checkedAt'],'updatedAt':d['updated_at'],'source':f['file']}
+        p['name']=d['name'];p['ministry']=d['ministry_name']
+        p['departments']=[d['organization']['flatten']['names']]
+        if not p['api']:p['api']={'id':d['id'],'name':d['name'],'ministry':d['ministry_name'],'purpose':d.get('purpose'),'overview':d.get('overview'),'currentIssues':d.get('task'),'fiscalYear':2025,'execution':None,'groups':[],'edges':[]}
+    f25=next(f for f in live['files'] if f['year']==2025 and f['type']=='RS')
+    raw=(ROOT/'data/live'/f25['file']).read_bytes();assert hashlib.sha256(raw).hexdigest()==f25['sha256']
+    live25=json.loads(gzip.decompress(raw))['records']
+    for d in live25:
+        pid=str(int(d['project_number']))
+        if (2025,pid) in programs:continue
+        overview={'purpose':d.get('purpose'),'overview':d.get('overview'),'currentIssues':d.get('task')}
+        programs[(2025,pid)]={'id':pid,'year':2025,'name':d['name'],'ministry':d['ministry_name'],'departments':[d['organization']['flatten']['names']],'overview':overview,'liveOverview':overview,'budget':[],'outcomes':None,'indicators':None,'contracts':[],'flows':{},'liveRecord':{'id':d['id'],'checkedAt':live['checkedAt'],'updatedAt':d['updated_at'],'source':f25['file']}}
 evidence=load(ROOT/'data'/'evidence'/'manifest.json') if (ROOT/'data'/'evidence'/'manifest.json').exists() else None
 for y in (2025,2026):
     file=ROOT/'data'/'evidence'/f'mof-rs-kou-moku-linkage-{y}.json.gz'
@@ -153,9 +192,10 @@ for o in orgs.values():
     for field in ('aliases','refs','funds','segments'):o[field]=sorted(o[field])
     org_index.append(o)
 org_index.sort(key=lambda o:o['name']);put('organizations.json.gz',org_index)
-meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'organizationCount':len(org_index),'officialHeaders':official_headers,'officialRows':official_rows,'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:(root_order.get(r['name'],999),r['name'])),'headers':headers,'sources':{'csv':rs,'extended':ex,'evidence':evidence,'official':official},'notes':['2024年版は公開保存された原CSVの全行を事業単位で接続。','2025年版は直接取得した公式原CSVの全行・全列と加工済み表示を接続。2026年版は加工済み暫定保存版で、成果・評価は未収録。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
+meta={'builtAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'counts':counts,'organizationCount':len(org_index),'officialHeaders':official_headers,'officialRows':official_rows,'coverage':coverage,'roots':sorted(roots.values(),key=lambda r:(root_order.get(r['name'],999),r['name'])),'headers':headers,'sources':{'csv':rs,'extended':ex,'evidence':evidence,'official':official,'live':live,'officialChecks':corrections},'notes':['2024年版は公開保存版の原CSVと公式訂正版を、各ファイルの取得記録を保持して接続。','2025年版は直接取得した公式原CSVの全行・全列と加工済み表示を接続。2026年版は加工済み暫定保存版で、成果・評価は未収録。','別年度の値で空欄を埋めず、関連年度の資料として接続。','支出・契約・基金残高・返納や多段階の支出先を合算しない。']}
 put('meta.json',meta);put('funds.json.gz',funds);put('fund-payments.json.gz',fund_payments);put('segments.json.gz',segments)
 # Compact representative schemas for verifying complete rendering, never a data cap.
 put('schema-samples.json',{n:{'keys':list(d.keys()),'sample':d} for n,d in [('overview',next(iter(base.values()))),('budget',next(iter(budget['projects'].values()))[0]),('outcomes',next(iter(outcomes.values()))),('flow',next(iter(flows.values())))]})
-assert len(indexes[2025])==len(base) and len(indexes[2026])==len(ext('rs-api-2026-details'))
+assert len(indexes[2025])==(len(set(base) | {str(int(d['project_number'])) for d in live25}) if live else len(base))
+assert len(indexes[2026])==(len({str(k) for k in ext('rs-api-2026-details')} | {str(int(d['project_number'])) for d in records}) if live else len(ext('rs-api-2026-details')))
 print(json.dumps({'counts':counts,'organizationCount':len(org_index),'officialHeaders':official_headers,'officialRows':official_rows,'coverage':coverage,'roots':len(roots),'csvRows':sum(raw_counts.values())},ensure_ascii=False),flush=True)
